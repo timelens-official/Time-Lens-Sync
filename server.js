@@ -74,10 +74,9 @@ app.post("/api/send-era", async (req, res) => {
     const { data: authData, error: authError } =
       await userSupabase.auth.getUser();
 
-    console.log("AUTH DATA:", authData);
-    console.log("AUTH ERROR:", authError);
-
     if (authError || !authData.user) {
+      console.error("❌ AUTH ERROR:", authError);
+
       return res.status(401).json({
         success: false,
         message: "Invalid access token"
@@ -124,7 +123,6 @@ app.post("/api/send-era", async (req, res) => {
           uid,
           email: profile.email || email,
           era,
-          consumed: false,
           updated_at: new Date().toISOString()
         },
         {
@@ -168,7 +166,6 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
       .from("headset_commands")
       .select("*")
       .eq("headset_id", headsetId)
-      .eq("consumed", false)
       .maybeSingle();
 
     if (error) {
@@ -186,17 +183,15 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
       });
     }
 
-    const { error: updateError } = await adminSupabase
+    const { error: deleteError } = await adminSupabase
       .from("headset_commands")
-      .update({
-        consumed: true
-      })
+      .delete()
       .eq("headset_id", headsetId);
 
-    if (updateError) {
+    if (deleteError) {
       return res.status(500).json({
         success: false,
-        message: updateError.message
+        message: deleteError.message
       });
     }
 
