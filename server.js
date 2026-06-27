@@ -3,7 +3,6 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { createClient } = require("@supabase/supabase-js");
-
 const app = express();
 
 app.use(cors({
@@ -15,7 +14,7 @@ app.use(cors({
 app.use(express.json({ limit: "10mb" }));
 
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("❌ Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
+  console.error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
   process.exit(1);
 }
 
@@ -25,8 +24,6 @@ const supabase = createClient(
 );
 
 app.get("/", (req, res) => {
-  console.log("📥 GET /");
-
   res.status(200).json({
     success: true,
     message: "Time Lens Supabase API running"
@@ -35,10 +32,6 @@ app.get("/", (req, res) => {
 
 app.post("/api/send-era", async (req, res) => {
   try {
-    console.log("\n==============================");
-    console.log("📥 POST /api/send-era");
-    console.log("Body:", req.body);
-
     const { accessToken, era } = req.body || {};
 
     if (!accessToken || !era) {
@@ -107,7 +100,6 @@ app.post("/api/send-era", async (req, res) => {
           uid,
           email: profile.email || email,
           era,
-          consumed: false,
           updated_at: new Date().toISOString()
         },
         {
@@ -132,7 +124,7 @@ app.post("/api/send-era", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("💥 SERVER ERROR:", error);
+    console.error("ERROR:", error);
 
     return res.status(500).json({
       success: false,
@@ -145,13 +137,10 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
   try {
     const headsetId = req.params.headsetId;
 
-    console.log(`🎮 Unity checking headset: ${headsetId}`);
-
     const { data: command, error } = await supabase
       .from("headset_commands")
       .select("*")
       .eq("headset_id", headsetId)
-      .eq("consumed", false)
       .maybeSingle();
 
     if (error) {
@@ -164,16 +153,9 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
     if (!command) {
       return res.status(200).json({
         success: false,
-        message: "No new command"
+        message: "No command yet"
       });
     }
-
-    await supabase
-      .from("headset_commands")
-      .update({
-        consumed: true
-      })
-      .eq("headset_id", headsetId);
 
     return res.status(200).json({
       success: true,
@@ -181,8 +163,6 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("💥 Unity endpoint error:", error);
-
     return res.status(500).json({
       success: false,
       message: error.message
@@ -193,5 +173,5 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log("🚀 Server running on port " + PORT);
+  console.log("Server running on " + PORT);
 });
