@@ -28,6 +28,8 @@ const adminSupabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+const DUPLICATE_WINDOW_MS = 10000;
+
 app.get("/", (req, res) => {
   res.status(200).json({
     success: true,
@@ -114,6 +116,29 @@ app.post("/api/send-era", async (req, res) => {
     }
 
     const headsetId = profile.headset_id;
+    const now = new Date();
+
+    const { data: oldCommand } = await adminSupabase
+      .from("headset_commands")
+      .select("headset_id, era, updated_at")
+      .eq("headset_id", headsetId)
+      .eq("era", era)
+      .maybeSingle();
+
+    if (oldCommand && oldCommand.updated_at) {
+      const diffMs = now.getTime() - new Date(oldCommand.updated_at).getTime();
+
+      if (diffMs < DUPLICATE_WINDOW_MS) {
+        console.log("⚠️ Duplicate command ignored");
+
+        return res.status(200).json({
+          success: true,
+          message: "Duplicate command ignored",
+          headsetId,
+          era
+        });
+      }
+    }
 
     const { error: commandError } = await adminSupabase
       .from("headset_commands")
@@ -123,7 +148,7 @@ app.post("/api/send-era", async (req, res) => {
           uid,
           email: profile.email || email,
           era,
-          updated_at: new Date().toISOString()
+          updated_at: now.toISOString()
         },
         {
           onConflict: "headset_id"
@@ -136,6 +161,8 @@ app.post("/api/send-era", async (req, res) => {
         message: commandError.message
       });
     }
+
+    console.log("✅ Era saved:", era, "for", headsetId);
 
     return res.status(200).json({
       success: true,
@@ -183,6 +210,8 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
       });
     }
 
+    const commandToSend = { ...command };
+
     const { error: deleteError } = await adminSupabase
       .from("headset_commands")
       .delete()
@@ -195,9 +224,11 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
       });
     }
 
+    console.log("✅ Command sent to Unity and deleted:", commandToSend);
+
     return res.status(200).json({
       success: true,
-      ...command
+      ...commandToSend
     });
 
   } catch (error) {
