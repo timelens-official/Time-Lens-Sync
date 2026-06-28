@@ -29,6 +29,7 @@ const adminSupabase = createClient(
 );
 
 const DUPLICATE_WINDOW_MS = 10000;
+const COMMAND_EXPIRE_MS = 5000;
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -126,7 +127,8 @@ app.post("/api/send-era", async (req, res) => {
       .maybeSingle();
 
     if (oldCommand && oldCommand.updated_at) {
-      const diffMs = now.getTime() - new Date(oldCommand.updated_at).getTime();
+      const diffMs =
+        now.getTime() - new Date(oldCommand.updated_at).getTime();
 
       if (diffMs < DUPLICATE_WINDOW_MS) {
         console.log("⚠️ Duplicate command ignored");
@@ -206,6 +208,24 @@ app.get("/api/unity/check/:headsetId", async (req, res) => {
       return res.status(200).json({
         success: false,
         message: "No new command",
+        headsetId
+      });
+    }
+
+    const ageMs =
+      Date.now() - new Date(command.updated_at).getTime();
+
+    if (ageMs > COMMAND_EXPIRE_MS) {
+      await adminSupabase
+        .from("headset_commands")
+        .delete()
+        .eq("headset_id", headsetId);
+
+      console.log("⏰ Command expired and deleted");
+
+      return res.status(200).json({
+        success: false,
+        message: "Command expired",
         headsetId
       });
     }
